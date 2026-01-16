@@ -75,6 +75,7 @@ func main() {
 		auth0.WithLogger(logger),
 		auth0.WithSessions(sessions),
 		auth0.WithPostLoginHooks(
+			// Sync user data from Auth0 to your database
 			users.SyncPostLogin(db.Pool, logger),
 		),
 	)
@@ -100,6 +101,7 @@ func main() {
 	
 	srv.Router.Route("/", func(r chi.Router) {
 		r.Use(requireAuth)
+		r.Use(users.LocalUserMiddleware(db.Pool, logger))
 
     // ...register your custom routes/handlers here
 	})
