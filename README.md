@@ -100,7 +100,6 @@ func main() {
 	
 	srv.Router.Route("/", func(r chi.Router) {
 		r.Use(requireAuth)
-		r.Use(users.LocalUserMiddleware(db.Pool, logger))
 
     // ...register your custom routes/handlers here
 	})
