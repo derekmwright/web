@@ -39,65 +39,80 @@ A minimal web service skeleton using several packages together:
 package main
 
 import (
-    "context"
-    "log"
-    "net/http"
-    "os"
-    "os/signal"
-    "syscall"
-    "time"
+	"embed"
+	"io/fs"
+	"log/slog"
+	"net/http"
+	"os"
 
-    "github.com/derekmwright/web/server"
-    "github.com/derekmwright/web/auth/auth0"
+	"github.com/derekmwright/web/auth/auth0"
+	"github.com/derekmwright/web/database/pg"
+	"github.com/derekmwright/web/server"
+	"github.com/alexedwards/scs/postgresstore"
+	"github.com/alexedwards/scs/v2"
+	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/stdlib"
 )
 
 func main() {
-    ctx, cancel := signal.NotifyContext(context.Background(),
-        syscall.SIGINT, syscall.SIGTERM)
-    defer cancel()
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
-    // Initialize Auth0 validator (expects AUTH0_ISSUER & AUTH0_AUDIENCE env vars)
-    auth, err := auth0.NewValidator()
-    if err != nil {
-        log.Fatalf("failed to init auth0: %v", err)
-    }
+	db, err := pg.New(
+		pg.WithLogger(logger),
+		pg.WithDSN(os.Getenv("DATABASE_URL")),
+	)
+	if err != nil {
+		logger.Error("failed to connect to database", "err", err)
+		os.Exit(1)
+	}
+	defer db.Close()
 
-    mux := http.NewServeMux()
+	sessions := scs.New()
+	sessions.Store = postgresstore.New(stdlib.OpenDBFromPool(db.Pool))
 
-    // Public route
-    mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
-        w.Write([]byte("ok"))
-    })
+	// Setup site-wide Auth0
+	registerAuth, requireAuth, err := auth0.New(
+		auth0.WithLogger(logger),
+		auth0.WithSessions(sessions),
+		auth0.WithPostLoginHooks(
+			users.SyncPostLogin(db.Pool, logger),
+		),
+	)
+	if err != nil {
+		logger.Error("failed to setup auth0", "err", err)
+		os.Exit(1)
+	}
 
-    // Protected route example
-    mux.Handle("GET /api/me", auth.Protect(
-        http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-            claims := auth0.ClaimsFrom(r.Context())
-            w.Write([]byte("Hello, " + claims.Subject))
-        }),
-    ))
+	srv := server.New(
+		server.WithLogger(logger),
+		server.WithMiddleware(func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Header.Get("Datastar-Request") == "true" {
+					token, _ := r.Cookie(sessions.Cookie.Name)
+					ctx, _ := sessions.Load(r.Context(), token.Value)
+					next.ServeHTTP(w, r.WithContext(ctx))
+				} else {
+					sessions.LoadAndSave(next).ServeHTTP(w, r)
+				}
+			})
+		}),
+	)
+	
+	srv.Router.Route("/", func(r chi.Router) {
+		r.Use(requireAuth)
+		r.Use(users.LocalUserMiddleware(db.Pool, logger))
 
-    srv := &http.Server{
-        Addr:    ":8080",
-        Handler: server.WithDefaultMiddleware(mux),
-    }
+    // ...register your custom routes/handlers here
+	})
 
-    go func() {
-        log.Printf("starting server on %s", srv.Addr)
-        if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-            log.Fatalf("server failed: %v", err)
-        }
-    }()
+	registerAuth(srv.Router)
 
-    <-ctx.Done()
-    shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 15*time.Second)
-    defer shutdownCancel()
-
-    log.Println("shutting down server...")
-    if err := srv.Shutdown(shutdownCtx); err != nil {
-        log.Printf("graceful shutdown error: %v", err)
-    }
+	if err = srv.Start(); err != nil {
+		logger.Error("failed to start server", "err", err)
+		os.Exit(1)
+	}
 }
+
 ```
 
 ## Contributing
