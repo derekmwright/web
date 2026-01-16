@@ -1,0 +1,66 @@
+# Go module files
+go.mod
+go.sum
+
+# Compiled binaries and executables
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.out
+
+# Test binaries and coverage
+*.test
+*.prof
+coverage.txt
+coverage.html
+
+# Build artifacts and directories
+/bin/
+/dist/
+/tmp/
+/build/
+
+# Dependency directories (if not using go modules vendor)
+/vendor/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Editor & IDE directories
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment and local config files
+.env
+.env.local
+.envrc
+.direnv/
+
+# Log files
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+
+# Go workspace file
+go.work
+go.work.sum
+
+# Optional: ignore local tooling binaries
+tools/
+
+# Ignore UI folder - WIP
+ui/
