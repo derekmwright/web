@@ -3,10 +3,11 @@ package auth0
 import "encoding/json"
 
 type SessionUser struct {
-	Sub     string `json:"sub"`
-	Name    string `json:"name"`
-	Email   string `json:"email"`
-	Picture string `json:"picture"`
+	Sub           string `json:"sub"`
+	Name          string `json:"name"`
+	Email         string `json:"email"`
+	EmailVerified bool   `json:"email_verified"`
+	Picture       string `json:"picture"`
 
 	Custom json.RawMessage `json:"-"`
 }
