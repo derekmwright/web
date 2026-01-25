@@ -101,7 +101,7 @@ func HandleCallback(deps *deps) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		
+
 		if sub, ok := rawClaims["sub"]; ok {
 			json.Unmarshal(sub, &user.Sub)
 		}
@@ -110,6 +110,9 @@ func HandleCallback(deps *deps) http.HandlerFunc {
 		}
 		if email, ok := rawClaims["email"]; ok {
 			json.Unmarshal(email, &user.Email)
+		}
+		if emailVerified, ok := rawClaims["email_verified"]; ok {
+			json.Unmarshal(emailVerified, &user.EmailVerified)
 		}
 		if picture, ok := rawClaims["picture"]; ok {
 			json.Unmarshal(picture, &user.Picture)
